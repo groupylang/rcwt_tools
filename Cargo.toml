@@ -1,0 +1,2 @@
+[workspace]
+members = [ "rcwt_cli", "rcwt_vm" ]
