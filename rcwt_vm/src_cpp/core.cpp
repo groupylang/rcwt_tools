@@ -1,6 +1,4 @@
-#include "mem.h"
-
-#include <iostream>
+#include "vm.h"
 
 uint8_t execute(thread* t, uint32_t entry_point=0) {
 #if defined __GNUC__ || defined __clang__ || defined __INTEL_COMPILER
@@ -17,12 +15,14 @@ uint8_t execute(thread* t, uint32_t entry_point=0) {
   #define END_DISPATCH }}
 #endif
 
+  // instruction pointer
   instr* ip = reinterpret_cast<instr*>(t->text + entry_point);
+  // current instruction
   instr i;
 
 #if defined __GNUC__ || defined __clang__ || defined __INTEL_COMPILER
   static void* opcode_table[] = {
-      /* 00 */ &&L_NOP,   /* 01 */ &&L_EXIT,  /* 02 */ &&L_DEBUG, /* 03 */ &&L_CONST,
+      /* 00 */ &&L_NOP,   /* 01 */ &&L_EXIT,  /* 02 */ &&L_BP, /* 03 */ &&L_CONST,
       /* 04 */ &&L_STORE, /* 05 */ &&L_LOAD,  /* 06 */ &&L_PUSH,  /* 07 */ &&L_POP,
       /* 08 */ &&L_NOP,   /* 09 */ &&L_NOP,   /* 0a */ &&L_NOP,   /* 0b */ &&L_NOP,
       /* 0c */ &&L_NOP,   /* 0d */ &&L_NOP,   /* 0e */ &&L_NOP,   /* 0f */ &&L_NOP,
@@ -104,7 +104,7 @@ uint8_t execute(thread* t, uint32_t entry_point=0) {
   };
 #else
   #define NOP   0x00
-  #define DEBUG 0x02
+  #define BP    0x02
   #define CONST 0x03
   #define STORE 0x04
   #define LOAD  0x05
@@ -156,7 +156,7 @@ uint8_t execute(thread* t, uint32_t entry_point=0) {
   #define GOTOL 0xfb
   #define NCALL 0xfc
 #endif
-
+  try {
   INIT_DISPATCH {
     CASE(NOP) {
       std::cout << "warning | nop (ip: " << reinterpret_cast<uint32_t*>(ip) - t->text << ")" << std::endl;
@@ -168,7 +168,20 @@ uint8_t execute(thread* t, uint32_t entry_point=0) {
     CASE(EXIT) {
       return i.operand0;
     } NEXT;
-    CASE(DEBUG) {
+    CASE(BP) {
+      std::cout << "debug | break point" << std::endl;
+      std::string input;
+      while (true) {
+        std::cout << "> ";
+        std::cin >> input;
+        if (input == "read") {
+          std::cin >> input;
+          if (input == "-t" || input == "--thread")  print(*t);
+          if (input == "-p" || input == "--process") print(*t->parent);
+        }
+        if (input == "resume") break;
+        if (input == "exit")  return 1;
+      }
     } NEXT;
 
     CASE(CONST) {
@@ -181,7 +194,7 @@ uint8_t execute(thread* t, uint32_t entry_point=0) {
       t->parent->registers[i.operand0] = t->stack[t->base_pointer + i.operand1];
     } NEXT;
     CASE(PUSH) {
-      push(t, t->parent->registers[i.operand0]);
+      push(*t, t->parent->registers[i.operand0]);
     } NEXT;
     CASE(POP) {
       t->parent->registers[i.operand0] = t->stack.back();
@@ -279,14 +292,14 @@ uint8_t execute(thread* t, uint32_t entry_point=0) {
       ip += i.operand0;
     } JUMP;
     CASE(CALL) {
-      push(t, t->base_pointer); // save bp to stack
+      push(*t, t->base_pointer); // save bp to stack
       t->base_pointer = t->stack.size();
       // TODO allocate locals
-      push(t, reinterpret_cast<uint32_t*>(++ip) - t->text); // save ip to stack
+      push(*t, reinterpret_cast<uint32_t*>(++ip) - t->text); // save ip to stack
       ip += i.operand0;
     } JUMP;
     CASE(RET) {
-      ip = reinterpret_cast<instr*>(t->text + pop(t)); // get pc from stack
+      ip = reinterpret_cast<instr*>(t->text + pop(*t)); // get pc from stack
     } JUMP;
     CASE(IFGT) {
       if (t->parent->registers[i.operand1] > t->parent->registers[i.operand2]) { ip += i.operand0; JUMP; }
@@ -300,7 +313,7 @@ uint8_t execute(thread* t, uint32_t entry_point=0) {
 
     CASE(NEW) {
       auto offset = t->parent->heap.size();
-      for (uint8_t u = 0; u < i.operand2; u++) t->parent->heap.push_back(0); // TODO
+      for (size_t k = 0; k < i.operand2; k++) t->parent->heap.push_back(0); // TODO
       t->parent->registers[i.operand0] = offset;
     } NEXT;
     CASE(SET) {
@@ -353,6 +366,30 @@ uint8_t execute(thread* t, uint32_t entry_point=0) {
     CASE(GOTOL) {
     } NEXT;
     CASE(NCALL) {
+      native_execute(t->natives, reinterpret_cast<size_t>(ip), *t);
     } NEXT;
   } END_DISPATCH;
+
+  } catch (std::invalid_argument&) {
+    std::cerr << "error | InvalidArgument" << std::endl;
+    return 1;
+  } catch (std::length_error&) {
+    std::cerr << "error | VectorOutOfBounds" << std::endl;
+    return 1;
+  } catch (std::out_of_range&) {
+    std::cerr << "error | ObjectTooLong" << std::endl;
+    return 1;
+  } catch (std::bad_alloc&) {
+    std::cerr << "error | BadAlloc" << std::endl;
+    return 1;
+  } catch (std::overflow_error&) {
+    std::cerr << "error | OverFlow" << std::endl;
+    return 1;
+  } catch (std::underflow_error&) {
+    std::cerr << "error | UnderFlow" << std::endl;
+    return 1;
+  } catch (std::exception& e) {
+    std::cerr << "error | " << e.what() << std::endl;
+    return 1;
+  }
 }

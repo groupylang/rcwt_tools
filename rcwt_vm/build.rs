@@ -8,6 +8,7 @@ fn main() {
   	.file("src_cpp/core.cpp")
     .file("src_cpp/mem.cpp")
     .file("src_cpp/util.cpp")
+    .file("src_cpp/jit.cpp")
   	.include("src_cpp")
 	.compile("vm_cpp")
 }
@@ -19,6 +20,7 @@ fn main() {
   	.file("src_cpp/core.cpp")
     .file("src_cpp/mem.cpp")
     .file("src_cpp/util.cpp")
+    .file("src_cpp/jit.cpp")
   	.include("src/c")
   	.compile("vm_cpp")
 }

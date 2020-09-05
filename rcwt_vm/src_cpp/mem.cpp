@@ -1,7 +1,7 @@
-#include "mem.h"
-
 #include <algorithm>
 #include <mutex>
+
+#include "vm.h"
 
 process* start_process(
   uint32_t data_size,
@@ -13,7 +13,7 @@ process* start_process(
   p->data_size = data_size;
   p->heap = std::vector<uint32_t>();
   p->heap.reserve(heap_capacity);
-  p->threads = std::unordered_map<uint32_t, std::future<uint8_t>>();
+  p->threads = std::unordered_map<size_t, std::future<uint8_t>>();
   p->threads.reserve(32);
   return p;
 }
@@ -38,23 +38,19 @@ process* process_from_rust(
   p->heap = std::vector<uint32_t>();
   p->heap.reserve(heap_capacity);
   std::copy(heap, heap + heap_capacity, p->heap.begin());
-  p->threads = std::unordered_map<uint32_t, std::future<uint8_t>>();
+  p->threads = std::unordered_map<size_t, std::future<uint8_t>>();
   p->threads.reserve(32);
 
   return p;
 }
 
-#include <iostream>
-
-void start_thread(
-  uint32_t id,
+// allocate memory to thread
+thread* allocate_thread(
   process* parent,
   uint32_t* text,
   uint32_t text_size,
-  uint32_t stack_capacity,
-  uint32_t entry_point
+  uint32_t stack_capacity
 ) {
-  // allocate memory to thread
   auto t = new thread;
   t->parent = parent;
   t->text = text;
@@ -62,6 +58,17 @@ void start_thread(
   t->stack = std::vector<uint32_t>();
   t->stack.reserve(stack_capacity);
   t->base_pointer = 0;
+  t->natives = std::unordered_map<size_t, native>();
+  t->natives.reserve(32);
+  return t;
+}
+
+void start_thread(
+  process* parent,
+  uint32_t id,
+  thread* t,
+  uint32_t entry_point
+) {
   // create native thread
   auto native_thread = std::async(std::launch::async, execute, t, entry_point);
   // add to children thread list
@@ -69,8 +76,8 @@ void start_thread(
 }
 
 uint8_t stop_thread(
-  uint32_t id,
-  process* parent
+  process* parent,
+  uint32_t id
 ) {
   // destroy native thread
   auto status = parent->threads[id].get();
@@ -80,15 +87,13 @@ uint8_t stop_thread(
   return status;
 }
 
-void thread_from_rust(
-  uint32_t id,
+thread* thread_from_rust(
   process* parent,
   uint32_t* text,
   uint32_t text_size,
   uint32_t* stack,
   uint32_t stack_capacity,
-  uint32_t base_pointer,
-  uint32_t entry_point
+  uint32_t base_pointer
 ) {
   auto t = new thread;
   t->parent = parent;
@@ -98,10 +103,20 @@ void thread_from_rust(
   t->stack.reserve(stack_capacity);
   std::copy(stack, stack + stack_capacity, t->stack.begin());
   t->base_pointer = base_pointer;
-  // create native thread
-  auto native_thread = std::async(std::launch::async, execute, t, entry_point);
-  // add to children thread list
-  parent->threads[id] = std::move(native_thread);
+  t->natives = std::unordered_map<size_t, native>();
+  t->natives.reserve(32);
+  return t;
+}
+
+void run_thread(
+  process* p,
+  size_t id,
+  thread* t,
+  uint32_t entry_point
+) {
+  start_thread(p, id, t, entry_point);
+  auto status = stop_thread(p, id);
+  std::cout << "log | exit status: " << static_cast<uint32_t>(status) << std::endl;
 }
 
 ProcessSerde* run(
@@ -112,11 +127,15 @@ ProcessSerde* run(
   uint32_t heap_capacity,
   uint32_t* text,
   uint32_t text_size,
-  uint32_t entry_point
+  uint32_t entry_point,
+  bool timer_on,
+  bool jit_on,
+  bool gc_on
 ) {
   auto p = process_from_rust(registers, data, data_size, heap, heap_capacity);
-  start_thread(0, p, text, text_size, 32, entry_point);
-  auto status = stop_thread(0, p);
-  std::cout << "log | exit status: " << static_cast<uint32_t>(status) << std::endl;
-  return process_from_cpp(p->registers, p->data, p->data_size, &p->heap[0], p->heap.capacity());
+  auto t = allocate_thread(p, text, text_size, 32);
+  auto id = reinterpret_cast<size_t>(t);
+  if (timer_on) timer(run_thread, p, id, t, entry_point);
+  else run_thread(p, id, t, entry_point);
+  return process_from_cpp(p->registers, p->data, p->data_size, &p->heap.front(), p->heap.capacity());
 }

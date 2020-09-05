@@ -60,6 +60,18 @@ fn main() -> std::io::Result<()> {
       .help("Path of script")
       .takes_value(true)
     )
+    .arg(Arg::with_name("timer")
+      .long("timer")
+      .short("t")
+    )
+    .arg(Arg::with_name("just-in-time compile")
+      .long("jit")
+      .short("j")
+    )
+    .arg(Arg::with_name("garbage collector")
+      .long("gc")
+      .short("g")
+    )
   )
   .subcommand(SubCommand::with_name("test")
     .about("Tests script")
@@ -109,8 +121,11 @@ fn main() -> std::io::Result<()> {
     let id: isize = String::from(matches.value_of("id").unwrap()).parse().expect("id must be a number(isize)");
     if process_serdes.contains_key(&id) {
       let process_serde = process_serdes.get_mut(&id).unwrap();
+      let timer_on = matches.is_present("timer");
+      let jit_on = matches.is_present("just-in-time compiler");
+      let gc_on = matches.is_present("garbage collector");
       if let Some(path) = matches.value_of("path") {
-        let p = run_script(process_serde, path)?;
+        let p = run_script(process_serde, path, timer_on, jit_on, gc_on)?;
         process_serdes.insert(id, p);
       } else {
         prompt(process_serde)?;
