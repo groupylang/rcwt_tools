@@ -1,4 +1,4 @@
-name: RRCWT
+name: rcwt_tools
 
 on:
   push:
