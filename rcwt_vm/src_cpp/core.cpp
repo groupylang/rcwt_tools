@@ -160,10 +160,6 @@ uint8_t execute(thread* t, uint32_t entry_point=0) {
   INIT_DISPATCH {
     CASE(NOP) {
       std::cout << "warning | nop (ip: " << reinterpret_cast<uint32_t*>(ip) - t->text << ")" << std::endl;
-      // printf(" %04d", i.opcode);
-      // printf(" %04d", i.operand0);
-      // printf(" %04d", i.operand1);
-      // printf(" %04d", i.operand2);
     } NEXT;
     CASE(EXIT) {
       return i.operand0;

@@ -41,16 +41,18 @@ struct _instr {
 typedef struct ProcessSerde ProcessSerde;
 extern "C" ProcessSerde* process_from_cpp(uint32_t*, uint32_t*, uint32_t, uint32_t*, uint32_t);
 
-// mem.cpp
-process* start_process(uint32_t=32, uint32_t=32);
-void stop_process(process*);
+// process.cpp
+process* allocate_process(uint32_t=32, uint32_t=32);
 process* process_from_rust(uint32_t*, uint32_t*, uint32_t, uint32_t*, uint32_t);
 
-thread* allocate_thread(process*, uint32_t*, uint32_t=32, uint32_t=32);
-void start_thread(process*, uint32_t, thread*, uint32_t=0);
-uint8_t stop_thread(process*, uint32_t);
+// thread.cpp
+thread* allocate_thread(process*, uint32_t*, uint32_t, uint32_t=32);
+void start_thread(process*, size_t, thread*, uint32_t=0);
+uint8_t stop_thread(process*, size_t);
+void run_thread(process*, size_t, thread*, uint32_t=0);
 thread* thread_from_rust(process*, uint32_t*, uint32_t, uint32_t*, uint32_t, uint32_t);
 
+// ffi.cpp
 extern "C" ProcessSerde* run(uint32_t*, uint32_t*, uint32_t, uint32_t*, uint32_t, uint32_t*, uint32_t, uint32_t, bool=false, bool=false, bool=false);
 
 // core.cpp
