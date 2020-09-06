@@ -104,6 +104,7 @@ uint8_t execute(thread* t, uint32_t entry_point=0) {
   };
 #else
   #define NOP   0x00
+  #define EXIT  0x01
   #define BP    0x02
   #define CONST 0x03
   #define STORE 0x04
@@ -135,7 +136,6 @@ uint8_t execute(thread* t, uint32_t entry_point=0) {
   #define SHLI  0x2c
   #define SHRI  0x2d
   #define GOTO  0x40
-  #define EXIT  0x41
   #define CALL  0x42
   #define RET   0x43
   #define IFGT  0x44
@@ -309,7 +309,7 @@ uint8_t execute(thread* t, uint32_t entry_point=0) {
 
     CASE(NEW) {
       auto offset = t->parent->heap.size();
-      for (size_t k = 0; k < i.operand2; k++) t->parent->heap.push_back(0); // TODO
+      for (size_t k = 0; k < i.operand1; k++) t->parent->heap.push_back(0); // TODO
       t->parent->registers[i.operand0] = offset;
     } NEXT;
     CASE(SET) {
