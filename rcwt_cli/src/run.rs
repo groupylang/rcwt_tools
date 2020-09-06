@@ -16,7 +16,7 @@ pub fn prompt(p: &mut ProcessSerde) -> std::io::Result<()> {
 }
 
 // run .obj.yml script
-pub fn run_script(p: &mut ProcessSerde, path: &str) -> std::io::Result<ProcessSerde> {
+pub fn run_script(p: &mut ProcessSerde, path: &str, timer_on: bool, jit_on: bool, gc_on: bool) -> std::io::Result<ProcessSerde> {
   let mut script = super::fio::read_Script(path)?;
   let data_size = p.data.len() as u32;
   let heap_capacity = p.heap.len() as u32;
@@ -30,7 +30,10 @@ pub fn run_script(p: &mut ProcessSerde, path: &str) -> std::io::Result<ProcessSe
       heap_capacity,
       script.body.as_mut_ptr() as *mut u32,
       text_size,
-      script.entry_point
+      script.entry_point,
+      timer_on,
+      jit_on,
+      gc_on
     )
   };
   Ok(unsafe {std::mem::replace(&mut *q, Default::default())})

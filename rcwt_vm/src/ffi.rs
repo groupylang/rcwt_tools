@@ -39,7 +39,10 @@ extern "C" {
     heap_capacity: u32,
     text: *mut u32,
     text_size: u32,
-    entry_point: u32
+    entry_point: u32,
+    timer_on: bool,
+    jit_on: bool,
+    gc_on: bool
   ) -> *mut ProcessSerde;
 }
 
